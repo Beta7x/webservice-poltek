@@ -1,0 +1,5 @@
+{
+  "name": "Widies",
+  "email": "adepriyantowidies@gmail.com",
+  "educations": ["SD","SMP","SMA"],
+}
