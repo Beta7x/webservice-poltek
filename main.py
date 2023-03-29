@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import jwt
+import base64
 
 app = Flask(__name__)
 api = Api(app)
@@ -46,6 +47,74 @@ AUDIENCE_MOBILE = "myMobileApp"
 ISSUER = "myFlaskWebService"
 SECRET_KEY = "d2lkaWVzCg=="
 
+"""
+Basic Authentication with JWT / base64
+"""
+basic_auth_params = reqparse.RequestParser()
+basic_auth_params.add_argument('Authorization', type=str, location='headers', required=True, 
+                         help="You must post header data for authentication. FYI please read documentation https://swagger.io/specification")
+
+@api.route('/basic-auth')
+class BasicAuth(Resource):
+    @api.expect(basic_auth_params)
+    def post(self):
+        args = basic_auth_params.parse_args()
+        basic_auth = args['Authorization']
+        # basic-auth have value like "Basic YWRlcHJpeWFudG93aWRpZXNAZ21haWwuY29tOndpZGllczEyMwo="
+        base64_message = basic_auth[6:] # Remove first 6 digit character from basic_auth value
+        message_bytes = base64_message.encode('ascii')
+        base64_bytes = base64.b64decode(message_bytes)
+        pair = base64_bytes.decode('ascii')
+        # Pairing chiper text with plantext ex:("adepriyantowidies@gmail.com:123")
+        email, password = pair.split(':')
+        # for ex email is "adepriyantowidies@gmail.com" and password is "123"
+        return {
+            'email': email,
+            'password': password,
+        }
+
+"""
+End Basic Authentication
+"""
+
+"""
+Start Bearer Authentication
+"""
+bearer_auth_params = reqparse.RequestParser()
+bearer_auth_params.add_argument('Authorization', type=str, location='headers', required=True, 
+                         help="You must post header data for authentication. FYI please read documentation about JWT")
+@api.route('/bearer-auth')
+class BearerAuth(Resource):
+    @api.expect(bearer_auth_params)
+    def post(self):
+        args = bearer_auth_params.parse_args()
+        bearer_auth = args['Authorization']
+        # basic_auth have value like "Bearer <Your JWT token>"
+        jwt_token = bearer_auth[7:] # Remove first 7 digits basic_auth or remove "Bearer" keyword
+        try:
+            payload = jwt.decode(
+                jwt_token,
+                SECRET_KEY,
+                audience = [AUDIENCE_MOBILE],
+                issuer = ISSUER,
+                algorithms = ['HS256'],
+                options = {
+                    "require": ["aud", "iss"],
+                }
+            )
+        except:
+            return {
+                'message': 'Unauthorized! Token is Invalid'
+            }
+            
+        return {
+            'message': 'Token is Valid',
+            'payload': payload,
+        }, 200
+"""
+End of Bearer Authentication
+"""
+
 # Registration Service
 @api.route('/signup')
 class Registration(Resource):
@@ -80,6 +149,7 @@ class Registration(Resource):
             "message": "User successfully created!"
         }, 201
 
+# Login Service
 @api.route('/signin')
 class Login(Resource):
     @api.expect(auth_params)
